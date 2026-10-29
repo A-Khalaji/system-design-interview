@@ -1,0 +1,192 @@
+basePath: /api/v1
+definitions:
+  model.Item:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      price:
+        minimum: 0
+        type: number
+      updated_at:
+        type: string
+    required:
+    - name
+    - price
+    type: object
+info:
+  contact: {}
+  description: JSON API for practicing system design concepts.
+  title: System Design Interview API
+  version: "1.0"
+paths:
+  /items:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Item'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List items
+      tags:
+      - items
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Item data
+        in: body
+        name: item
+        required: true
+        schema:
+          $ref: '#/definitions/model.Item'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.Item'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create an item
+      tags:
+      - items
+  /items/{id}:
+    delete:
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete an item
+      tags:
+      - items
+    get:
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Item'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get an item
+      tags:
+      - items
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated item data
+        in: body
+        name: item
+        required: true
+        schema:
+          $ref: '#/definitions/model.Item'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Item'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update an item
+      tags:
+      - items
+swagger: "2.0"
