@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -6,14 +5,18 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swaggo/files"
+	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"gorm.io/gorm"
 
 	"system-design-interview/internal/handler"
 )
 
-func SetupRouter(db *gorm.DB) *gin.Engine {
+func SetupRouter(
+	primaryDB *gorm.DB,
+	replica1DB *gorm.DB,
+	replica2DB *gorm.DB,
+) *gin.Engine {
 	router := gin.Default()
 
 	router.Use(func(c *gin.Context) {
@@ -26,7 +29,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		c.Next()
 	})
 
-	itemHandler := handler.NewItemHandler(db)
+	itemHandler := handler.NewItemHandler(
+		primaryDB,
+		[]*gorm.DB{replica1DB, replica2DB},
+	)
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})

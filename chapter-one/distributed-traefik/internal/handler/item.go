@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -12,11 +13,22 @@ import (
 )
 
 type ItemHandler struct {
-	DB *gorm.DB
+	PrimaryDB  *gorm.DB
+	ReplicaDBs []*gorm.DB
+	readIndex  atomic.Uint64
 }
 
-func NewItemHandler(db *gorm.DB) *ItemHandler {
-	return &ItemHandler{DB: db}
+func NewItemHandler(primaryDB *gorm.DB, replicaDBs []*gorm.DB) *ItemHandler {
+	return &ItemHandler{
+		PrimaryDB:  primaryDB,
+		ReplicaDBs: replicaDBs,
+	}
+}
+
+// readDB distributes read requests between available replicas.
+func (h *ItemHandler) readDB() *gorm.DB {
+	index := h.readIndex.Add(1) - 1
+	return h.ReplicaDBs[index%uint64(len(h.ReplicaDBs))]
 }
 
 // CreateItem godoc
@@ -38,7 +50,8 @@ func (h *ItemHandler) CreateItem(c *gin.Context) {
 	}
 
 	item.ID = 0
-	if err := h.DB.Create(&item).Error; err != nil {
+
+	if err := h.PrimaryDB.Create(&item).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create item"})
 		return
 	}
@@ -56,7 +69,7 @@ func (h *ItemHandler) CreateItem(c *gin.Context) {
 func (h *ItemHandler) ListItems(c *gin.Context) {
 	var items []model.Item
 
-	if err := h.DB.Order("id ASC").Find(&items).Error; err != nil {
+	if err := h.readDB().Order("id ASC").Find(&items).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list items"})
 		return
 	}
@@ -82,7 +95,8 @@ func (h *ItemHandler) GetItem(c *gin.Context) {
 	}
 
 	var item model.Item
-	err = h.DB.First(&item, id).Error
+
+	err = h.readDB().First(&item, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "item not found"})
 		return
@@ -114,12 +128,15 @@ func (h *ItemHandler) UpdateItem(c *gin.Context) {
 		return
 	}
 
+	// Read from the primary to avoid replica lag during updates.
 	var item model.Item
-	if err := h.DB.First(&item, id).Error; err != nil {
+
+	if err := h.PrimaryDB.First(&item, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "item not found"})
 			return
 		}
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get item"})
 		return
 	}
@@ -139,7 +156,7 @@ func (h *ItemHandler) UpdateItem(c *gin.Context) {
 	item.Description = input.Description
 	item.Price = input.Price
 
-	if err := h.DB.Save(&item).Error; err != nil {
+	if err := h.PrimaryDB.Save(&item).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update item"})
 		return
 	}
@@ -164,11 +181,13 @@ func (h *ItemHandler) DeleteItem(c *gin.Context) {
 		return
 	}
 
-	result := h.DB.Delete(&model.Item{}, id)
+	result := h.PrimaryDB.Delete(&model.Item{}, id)
+
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete item"})
 		return
 	}
+
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "item not found"})
 		return

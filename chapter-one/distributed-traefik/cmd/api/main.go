@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 
@@ -17,16 +18,26 @@ import (
 func main() {
 	gin.SetMode(gin.ReleaseMode)
 
-	db, err := database.Connect()
+	primaryDB, err := database.Connect(os.Getenv("DB_HOST"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := db.AutoMigrate(&model.Item{}); err != nil {
+	replica1DB, err := database.Connect(os.Getenv("DB_REPLICA_HOST"))
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	router := SetupRouter(db)
+	replica2DB, err := database.Connect(os.Getenv("DB_REPLICA_HOST_2"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := primaryDB.AutoMigrate(&model.Item{}); err != nil {
+		log.Fatal(err)
+	}
+
+	router := SetupRouter(primaryDB, replica1DB, replica2DB)
 
 	log.Println("API listening on :8080")
 	if err := router.Run(":8080"); err != nil {
